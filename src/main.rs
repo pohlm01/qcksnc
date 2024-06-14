@@ -1,3 +1,4 @@
+use std::fs::{File, OpenOptions};
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -137,10 +138,13 @@ async fn handle_incoming(conn: Incoming) -> Result<()> {
     let (mut tx, mut rx) = connection.accept_bi().await?;
     debug!("accepted connection");
 
-    let mut res = String::new();
-    rx.read_to_string(&mut res).await?;
-    debug!(res, "received");
-    tx.write_all(res.as_bytes()).await?;
+    let mut file_name = String::new();
+    rx.read_to_string(&mut file_name).await?;
+    debug!(file_name, "requested file");
+    let mut file = tokio::fs::File::open(file_name).await?;
+
+    tokio::io::copy(&mut file, &mut tx).await?;
+
     debug!("written response");
 
     tx.finish()?;
@@ -157,17 +161,24 @@ async fn handle_outgoing(conn: Connecting) -> Result<()> {
     let (mut tx, mut rx) = conn.open_bi().await?;
     debug!("established connection");
 
-    tx.write_all(b"Hello world!").await?;
+    tx.write_all(b"/etc/passwd").await?;
     debug!("written request");
     tx.finish()?;
     debug!("finished");
     tx.stopped().await?;
     debug!("flushed");
 
-    let mut result = String::new();
-    rx.read_to_string(&mut result).await?;
-
-    info!(result);
+    let dest_file = File::options()
+        .read(true)
+        .write(true)
+        .create_new(true)
+        .open("temp.sync")?;
+    dest_file.set_len(10_000)?;
+    let mut map = unsafe { memmap2::MmapMut::map_mut(&dest_file)? };
+    while let Some(chunk) = rx.read_chunk(10, false).await? {
+        let offset = chunk.offset as usize;
+        map[offset..][..chunk.bytes.len()].copy_from_slice(&chunk.bytes);
+    }
 
     Ok(())
 }
