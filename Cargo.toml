@@ -1,0 +1,19 @@
+[package]
+name = "qck_snc"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+quinn = "0.11.2"
+tokio = { version = "1.38.0", features = ["full"] }
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+color-eyre = "0.6.3"
+clap = { version = "4.5.7", features = ["derive"] }
+rcgen = { version = "0.13.1", features = ["pem"] }
+rustls-pemfile = "2.1.2"
+rustls = { version = "0.23.10" }
+directories-next = "2.0.0"
+
+[profile.dev.package.backtrace]
+opt-level = 3
